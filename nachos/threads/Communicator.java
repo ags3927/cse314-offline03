@@ -35,15 +35,15 @@ public class Communicator {
         this.communicateLock.acquire();
 
         while (hasSpoken) {
-            this.communicateLock.release();
+            this.listenCondition.wakeAll();
             this.speakCondition.sleep();
-            this.communicateLock.acquire();
         }
 
         this.spokenWord = word;
         this.hasSpoken = true;
 
-        this.listenCondition.wakeAll(); /// wake all before lock release or after release? Not sure, is it same? whatever the sequence?
+        this.listenCondition.wakeAll();
+        this.speakCondition.sleep();
 
         this.communicateLock.release();
     }
@@ -58,16 +58,13 @@ public class Communicator {
 
         this.communicateLock.acquire();
 
-        while (!hasSpoken) {   /// I'm right ^w^
-            this.communicateLock.release();
+        while (!hasSpoken) {   /// I'm wrong U_U
             this.listenCondition.sleep();
-            this.communicateLock.acquire();
         }
 
         int transferWord = this.spokenWord;
         hasSpoken = false;
-
-        this.speakCondition.wakeAll(); /// wake all before lock release or after release? Not sure, is it same? whatever the sequence?
+        this.speakCondition.wakeAll();
 
         this.communicateLock.release();
 
@@ -80,4 +77,75 @@ public class Communicator {
 
     private int spokenWord;
     private boolean hasSpoken;
+
+
+    public static void selfTest()
+    {
+
+
+        KThread t1 = new KThread(new ComTest(1));
+        KThread t2 = new KThread(new ComTest(2));
+        KThread t3 = new KThread(new ComTest(3));
+        KThread t4 = new KThread(new ComTest(4));
+        KThread t5 = new KThread(new ComTest(5));
+
+        t1.fork();
+        t2.fork();
+        t3.fork();
+        t4.fork();
+        t5.fork();
+
+        //run the test
+        System.out.println("-----Communicator Test---------");
+        new ComTest(0).run();
+    }
+
+
+    protected static class ComTest implements Runnable
+    {
+
+        private int comID;
+
+        private static Communicator comm = new Communicator();
+
+        // Construct the object. Pass the comID of the thread plus any variables you
+        // want to share between threads. You may want to pass a KThread as a global
+        // variable to test join.
+        ComTest(int comID)
+        {
+            this.comID = comID;
+        }
+
+
+        public void run() {
+            // Use an if statement to make the different threads execute different
+            // code.
+            if (comID == 0)
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    System.out.println("ComTest " + comID + " Speak(" + i + ")");
+                    comm.speak(i);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    System.out.println("ComTest " + comID + " listening to... " + i);
+                    int transfered = comm.listen();
+                    System.out.println("ComTest " + comID + " heard word " + transfered);
+                }
+            }
+
+            if (comID == 0)
+                System.out.println("-----Communicator Test Complete-------");
+            ThreadedKernel.alarm.waitUntil(2000);
+
+
+
+        }
+    }
+
+
 }
