@@ -190,14 +190,12 @@ public class KThread {
         Lib.assertTrue(toBeDestroyed == null);
         toBeDestroyed = currentThread;
 
-        if (currentThread.joinQueue != null) // checks if another thread(s) was waiting for this to finish
+        KThread waitingThread = currentThread.waitingForThisThread.nextThread();
+
+        while (waitingThread != null)
         {
-            KThread toBeJoined = currentThread.joinQueue.nextThread();
-            while (toBeJoined != null)
-            {
-                toBeJoined.ready(); // allows thread to resume
-                toBeJoined = currentThread.joinQueue.nextThread();
-            }
+            waitingThread.ready();
+            waitingThread = currentThread.waitingForThisThread.nextThread();
         }
 
         currentThread.status = statusFinished;
@@ -287,17 +285,20 @@ public class KThread {
 
         if (status != statusFinished)
         {
-            boolean intStatus = Machine.interrupt().disable(); // calling sleep() requires interrupts disabled
-            if (joinQueue == null)
-            {
-                joinQueue = ThreadedKernel.scheduler.newThreadQueue(true); // initialize thread queue
-                joinQueue.acquire(this); // all threads in queue waits on this thread
-            }
-            //call function to decrement priority
+            boolean intStatus = Machine.interrupt().disable();
 
-            joinQueue.waitForAccess(currentThread); // make current thread wait
-            currentThread.sleep(); // sleep until this finishes
-            Machine.interrupt().restore(intStatus); // re-enable interrupts
+            KThread waitingThread = waitingForThisThread.nextThread();
+
+            if (waitingThread == null)
+            {
+                waitingForThisThread.acquire(this);
+            }
+
+            waitingForThisThread.waitForAccess(currentThread);
+
+            sleep();
+
+            Machine.interrupt().restore(intStatus);
         }
 
     }
@@ -472,5 +473,5 @@ public class KThread {
     private static KThread toBeDestroyed = null;
     private static KThread idleThread = null;
 
-    private ThreadQueue joinQueue = null;
+    private ThreadQueue waitingForThisThread = ThreadedKernel.scheduler.newThreadQueue(false);
 }
