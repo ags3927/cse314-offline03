@@ -7,7 +7,7 @@
 
 #### Task - 2: Implement condition variables directly -> Shuvo
 
-#### Task - 3: Complete the implementation of Alarm class -> Aniruddha
+#### Task - 3: Complete the implementation of Alarm class -> Aniruddha -> DONE
 
 #### Task - 4: Implement synchronous send and receive of one-word messages -> Shuvo
 
@@ -23,4 +23,3 @@
 ## 2. Multiprogramming
 
 #### TBD
-
