@@ -3,7 +3,6 @@ package nachos.threads;
 import nachos.machine.Lib;
 import nachos.machine.Machine;
 
-import javax.crypto.Mac;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -29,9 +28,12 @@ public class Alarm {
 
     /**
      * The timer interrupt handler. This is called by the machine's timer
-     * periodically (approximately every 500 clock ticks). Causes the current thread
-     * to yield, forcing a context switch if there is another thread that should be
-     * run.
+     * periodically (approximately every 500 clock ticks).
+     * <p>
+     * Checks whether any of the sleeping threads are due to be woken up.
+     * Wakes threads up accordingly.
+     * Then causes the current thread to yield, forcing a context switch
+     * if there is another thread that should be run.
      */
     public void timerInterrupt() {
         for (KThread sleepingThread : sleepQueue) {
@@ -56,7 +58,6 @@ public class Alarm {
      * @see nachos.machine.Timer#getTime()
      */
     public void waitUntil(long x) {
-        // for now, cheat just to get something working (busy waiting is bad)
         long wakeTime = Machine.timer().getTime() + x;
 
         Lib.assertTrue(Machine.interrupt().disabled());
@@ -69,20 +70,9 @@ public class Alarm {
     }
 
     /**
-     * Check if the currentThread has slept for the intended duration after a call of waitUntil(long x).
-     * If yes, add it to the readyQueue.
-     *
-     * @param wakeTime the time after which the currentThread should be added back to the readyQueue
+     * sleepQueue - An arraylist of KThreads that have been put to sleep for a certain time
+     * sleeTimerMap - A hashmap that maps sleeping KThreads to how long they are supposed to sleep
      */
-    public void setReadyWhenTime(long wakeTime) {
-        if (Machine.timer().getTime() >= wakeTime) {
-            boolean intStatus = Machine.interrupt().disable();
-            KThread.currentThread().ready();
-            Machine.interrupt().restore(intStatus);
-        }
-
-    }
-
     private static ArrayList<KThread> sleepQueue = new ArrayList<>();
     private static HashMap<KThread, Long> sleepTimerMap = new HashMap<>();
 }
