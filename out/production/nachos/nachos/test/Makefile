@@ -13,7 +13,7 @@ GCCDIR = $(ARCHDIR)/mips-
 
 ASFLAGS = -mips1
 CPPFLAGS =
-CFLAGS = -O2 -B$(GCCDIR) -g 0 -Wa,-mips1 -nostdlib -ffreestanding
+CFLAGS = -O2 -B$(ARCHDIR) -G 0 -Wa,-mips1 -nostdlib -ffreestanding
 LDFLAGS = -s -T script -N -warn-common -warn-constructors -warn-multiple-gp
 
 CC = $(GCCDIR)gcc
