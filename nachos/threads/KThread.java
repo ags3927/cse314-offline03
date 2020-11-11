@@ -138,8 +138,7 @@ public class KThread {
         Lib.assertTrue(status == statusNew);
         Lib.assertTrue(target != null);
 
-        Lib.debug(dbgThread,
-                "Forking thread: " + toString() + " Runnable: " + target);
+        Lib.debug(dbgThread, "Forking thread: " + toString() + " Runnable: " + target);
 
         boolean intStatus = Machine.interrupt().disable();
 
@@ -355,7 +354,7 @@ public class KThread {
      * changed from running to blocked or ready (depending on whether the
      * thread is sleeping or yielding).
      *
-     * @param    finishing    <tt>true</tt> if the current thread is
+     * If the current thread is
      * finished, and should be destroyed by the new
      * thread.
      */
@@ -427,11 +426,16 @@ public class KThread {
      * Tests whether this module is working.
      */
     public static void selfTest() {
-        Lib.debug(dbgThread, "Enter KThread.selfTest");
+        Lib.debug(dbgThread, "Entering KThread.selfTest");
+        System.out.println("\n--------------------------------------");
+        System.out.println("ENTERING TEST - KThread.selfTest\n");
 
         new KThread(new PingTest(1)).setName("forked thread").fork();
         new PingTest(0).run();
         joinTest();
+        System.out.println("\nEXITING TEST - KThread.selfTest");
+        System.out.println("--------------------------------------\n");
+        Lib.debug(dbgThread, "Exiting KThread.selfTest");
     }
 
 

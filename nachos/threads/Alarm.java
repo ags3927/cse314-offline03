@@ -5,6 +5,7 @@ import nachos.machine.Machine;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Random;
 
 /**
  * Uses the hardware timer to provide preemption, and to allow threads to sleep
@@ -43,6 +44,8 @@ public class Alarm {
         for (int i = 0; i < sleepQueue.size(); i++) {
             if (time >= sleepTimerMap.get(sleepQueue.get(i).toString())) {
                 sleepQueue.get(i).ready();
+
+                System.out.println(sleepQueue.get(i).getName() + " waited for at least " + sleepTimerMap.get(sleepQueue.get(i).toString()) + " ticks and has been woken up at " + time);
                 sleepTimerMap.remove(sleepQueue.get(i).toString());
                 sleepQueue.remove(i);
                 i--;
@@ -69,11 +72,15 @@ public class Alarm {
 
         boolean intStatus = Machine.interrupt().disable();
 
-        long wakeTime = Machine.timer().getTime() + x;
+        long currentTime = Machine.timer().getTime();
+
+        long wakeTime = currentTime + x;
 
         sleepQueue.add(KThread.currentThread());
 
         sleepTimerMap.put(KThread.currentThread().toString(), wakeTime);
+
+        System.out.println(KThread.currentThread().getName() + " is being sent to sleep at " + currentTime + " for " + x + " ticks");
 
         KThread.sleep();
 
@@ -84,6 +91,35 @@ public class Alarm {
      * sleepQueue - An arraylist of KThreads that have been put to sleep for a certain time
      * sleepTimerMap - A hashmap that maps sleeping KThreads to how long they are supposed to sleep
      */
-    private static ArrayList<KThread> sleepQueue = new ArrayList<>();;
-    private static HashMap<String, Long> sleepTimerMap = new HashMap<>();;
+    ArrayList<KThread> sleepQueue = new ArrayList<>();
+    private HashMap<String, Long> sleepTimerMap = new HashMap<>();
+    private static final char dbgAlarm = 'a';
+
+    public static void selfTest() {
+        Lib.debug(dbgAlarm, "Entering Alarm.selfTest");
+
+        System.out.println("\n--------------------------------------");
+        System.out.println("ENTERING TEST - Alarm.selfTest\n");
+
+        System.out.println("Creating 5 threads with random timed waitUntil calls inside their runnable targets.");
+        for (int i = 0; i < 5; i++) {
+            new KThread(new Runnable() {
+                @Override
+                public void run() {
+                    ThreadedKernel.alarm.waitUntil(Math.abs(new Random().nextInt(1000)));
+                }
+            }).setName("Thread-" + i).fork();
+        }
+
+        KThread.yield();
+
+        while (ThreadedKernel.alarm.sleepQueue.size() > 0) KThread.yield();
+
+        System.out.println("\nEXITING TEST - Alarm.selfTest");
+        System.out.println("--------------------------------------\n");
+
+        Lib.debug(dbgAlarm, "Exiting Alarm.selfTest");
+    }
+
+
 }

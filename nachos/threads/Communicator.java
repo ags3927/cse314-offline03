@@ -1,5 +1,10 @@
 package nachos.threads;
 
+import nachos.machine.Lib;
+import nachos.machine.Machine;
+
+import java.util.Random;
+
 /**
  * A <i>communicator</i> allows threads to synchronously exchange 32-bit
  * messages. Multiple threads can be waiting to <i>speak</i>,
@@ -28,7 +33,7 @@ public class Communicator {
      * Does not return until this thread is paired up with a listening thread.
      * Exactly one listener should receive <i>word</i>.
      *
-     * @param	word	the integer to transfer.
+     * @param    word    the integer to transfer.
      */
     public void speak(int word) {
 
@@ -52,8 +57,8 @@ public class Communicator {
      * Wait for a thread to speak through this communicator, and then return
      * the <i>word</i> that thread passed to <tt>speak()</tt>.
      *
-     * @return	the integer transferred.
-     */    
+     * @return the integer transferred.
+     */
     public int listen() {
 
         this.communicateLock.acquire();
@@ -74,7 +79,54 @@ public class Communicator {
     private Lock communicateLock;
     private Condition2 speakCondition;
     private Condition2 listenCondition;
+    private static final char dbgCommunicator = 'j';
 
     private int spokenWord;
     private boolean hasSpoken;
+
+
+    public static void selfTest() {
+        Lib.debug(dbgCommunicator, "Entering Communicator.selfTest");
+        System.out.println("\n--------------------------------------");
+        System.out.println("ENTERING TEST - Communicator.selfTest\n");
+
+        Communicator communicator = new Communicator();
+
+
+        for (int j = 0; j < 5; j++) {
+
+            int finalJ = j;
+
+            new KThread(new Runnable() {
+                @Override
+                public void run() {
+
+                    for (int i = 0; i < 5; i++) {
+                        System.out.println("Thread-" + finalJ + " is listening to hear its word-" + i);
+                        int transfered = communicator.listen();
+                        System.out.println("Thread-" + finalJ + " heard its word-" + i + ", which is the speaker's word-" + transfered);
+                    }
+                }
+            }).fork();
+        }
+
+        KThread tempThread = new KThread(new Runnable() {
+            @Override
+            public void run() {
+                for (int i = 0; i < 5; i++) {
+                    System.out.println("Thread-" + 6 + " speak(" + i + ")");
+                    communicator.speak(i);
+                }
+            }
+        });
+        tempThread.fork();
+        tempThread.join();
+
+        System.out.println("\nEXITING TEST - Communicator.selfTest");
+        System.out.println("--------------------------------------\n");
+        Lib.debug(dbgCommunicator, "Exiting Communicator.selfTest");
+
+    }
+
+
 }
