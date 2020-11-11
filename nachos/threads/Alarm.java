@@ -40,6 +40,8 @@ public class Alarm {
             if (Machine.timer().getTime() > sleepTimerMap.get(sleepingThread)) {
                 boolean intStatus = Machine.interrupt().disable();
                 sleepingThread.ready();
+                sleepQueue.remove(sleepingThread);
+                sleepTimerMap.remove(sleepingThread);
                 Machine.interrupt().restore(intStatus);
             }
         }
