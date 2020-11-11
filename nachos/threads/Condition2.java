@@ -2,6 +2,8 @@ package nachos.threads;
 
 import nachos.machine.*;
 
+import java.util.ArrayList;
+
 /**
  * An implementation of condition variables that disables interrupt()s for
  * synchronization.
@@ -21,7 +23,8 @@ public class Condition2 {
      *				<tt>wake()</tt>, or <tt>wakeAll()</tt>.
      */
     public Condition2(Lock conditionLock) {
-	this.conditionLock = conditionLock;
+        this.conditionLock = conditionLock;
+        this.threadArrayList = new ArrayList<>();
     }
 
     /**
@@ -35,6 +38,12 @@ public class Condition2 {
 
 	conditionLock.release();
 
+	// replacing the use of Semaphore P() function
+	boolean intStatus = Machine.interrupt().disable();
+	threadArrayList.add(KThread.currentThread());
+	KThread.sleep();
+	Machine.interrupt().restore(intStatus);
+
 	conditionLock.acquire();
     }
 
@@ -43,7 +52,17 @@ public class Condition2 {
      * current thread must hold the associated lock.
      */
     public void wake() {
-	Lib.assertTrue(conditionLock.isHeldByCurrentThread());
+        Lib.assertTrue(conditionLock.isHeldByCurrentThread());
+
+        // replacing the use of Semaphore V() function
+        boolean intStatus = Machine.interrupt().disable();
+
+        if (threadArrayList.size() > 0){
+            threadArrayList.remove(0).ready();
+        }
+
+        Machine.interrupt().restore(intStatus);
+
     }
 
     /**
@@ -51,8 +70,15 @@ public class Condition2 {
      * thread must hold the associated lock.
      */
     public void wakeAll() {
-	Lib.assertTrue(conditionLock.isHeldByCurrentThread());
+
+        Lib.assertTrue(conditionLock.isHeldByCurrentThread());
+
+        while (!threadArrayList.isEmpty()) {
+            wake();
+        }
+
     }
 
     private Lock conditionLock;
+    private ArrayList<KThread> threadArrayList;
 }
