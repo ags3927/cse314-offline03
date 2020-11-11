@@ -13,7 +13,13 @@ public class Communicator {
     /**
      * Allocate a new communicator.
      */
+
     public Communicator() {
+        this.communicateLock = new Lock();
+        this.speakCondition = new Condition2(communicateLock);
+        this.listenCondition = new Condition2(communicateLock);
+
+        this.hasSpoken = false;
     }
 
     /**
@@ -27,6 +33,21 @@ public class Communicator {
      * @param	word	the integer to transfer.
      */
     public void speak(int word) {
+
+        this.communicateLock.acquire();
+
+        while (hasSpoken){
+            this.communicateLock.release();
+            this.speakCondition.sleep();
+            this.communicateLock.acquire();
+        }
+
+        this.spokenWord = word;
+        this.hasSpoken = true;
+
+        this.listenCondition.wakeAll(); /// wake all before lock release or after release? Not sure, is it same? whatever the sequence?
+
+        this.communicateLock.release();
     }
 
     /**
@@ -36,6 +57,29 @@ public class Communicator {
      * @return	the integer transferred.
      */    
     public int listen() {
-	return 0;
+
+        this.communicateLock.acquire();
+
+        while (!hasSpoken) {   /// I'm quite confused -_-
+            this.communicateLock.release();
+            this.listenCondition.sleep();
+            this.communicateLock.acquire();
+        }
+
+        int transferWord = this.spokenWord;
+        hasSpoken = false;
+
+        this.speakCondition.wakeAll(); /// wake all before lock release or after release? Not sure, is it same? whatever the sequence?
+
+        this.communicateLock.release();
+
+        return transferWord;
     }
+
+    private Lock communicateLock;
+    private Condition2 speakCondition;
+    private Condition2 listenCondition;
+
+    private int spokenWord;
+    private boolean hasSpoken;
 }
