@@ -431,7 +431,43 @@ public class KThread {
 
         new KThread(new PingTest(1)).setName("forked thread").fork();
         new PingTest(0).run();
+        joinTest();
     }
+
+
+    public static void joinTest() {
+        Lib.debug(dbgThread, "Joining a thread to currentThread");
+
+        final KThread newThread = new KThread();
+
+        newThread.setTarget(new Runnable() {
+            @Override
+            public void run() {
+                boolean joiningToSelfError = false;
+                try {
+                    newThread.join();
+                } catch (Error e) {
+                    joiningToSelfError = true;
+                }
+                String str = joiningToSelfError ? "Test passed - Could not join with self" : "Test failed - Joined with self";
+                System.out.println(str);
+            }
+        });
+
+        String str = "Successfully joined forked thread to parent thread";
+
+        newThread.fork();
+
+        try {
+            newThread.join();
+        } catch (Error e) {
+            str = "Failed to join forked thread to parent thread";
+        }
+
+        System.out.println(str);
+    }
+
+
 
     private static final char dbgThread = 't';
 
