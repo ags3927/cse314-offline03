@@ -36,15 +36,21 @@ public class Alarm {
      * if there is another thread that should be run.
      */
     public void timerInterrupt() {
-        for (KThread sleepingThread : sleepQueue) {
-            if (Machine.timer().getTime() > sleepTimerMap.get(sleepingThread)) {
-                boolean intStatus = Machine.interrupt().disable();
-                sleepingThread.ready();
-                sleepQueue.remove(sleepingThread);
-                sleepTimerMap.remove(sleepingThread);
-                Machine.interrupt().restore(intStatus);
+        long time = Machine.timer().getTime();
+
+        boolean intStatus = Machine.interrupt().disable();
+
+        for (int i = 0; i < sleepQueue.size(); i++) {
+            if (time >= sleepTimerMap.get(sleepQueue.get(i).toString())) {
+                sleepQueue.get(i).ready();
+                sleepTimerMap.remove(sleepQueue.get(i).toString());
+                sleepQueue.remove(i);
+                i--;
             }
         }
+
+        Machine.interrupt().restore(intStatus);
+
         KThread.yield();
     }
 
@@ -60,21 +66,24 @@ public class Alarm {
      * @see nachos.machine.Timer#getTime()
      */
     public void waitUntil(long x) {
+
+        boolean intStatus = Machine.interrupt().disable();
+
         long wakeTime = Machine.timer().getTime() + x;
 
-        Lib.assertTrue(Machine.interrupt().disabled());
-
         sleepQueue.add(KThread.currentThread());
-        sleepTimerMap.put(KThread.currentThread(), wakeTime);
+
+        sleepTimerMap.put(KThread.currentThread().toString(), wakeTime);
 
         KThread.sleep();
 
+        Machine.interrupt().restore(intStatus);
     }
 
     /**
      * sleepQueue - An arraylist of KThreads that have been put to sleep for a certain time
-     * sleeTimerMap - A hashmap that maps sleeping KThreads to how long they are supposed to sleep
+     * sleepTimerMap - A hashmap that maps sleeping KThreads to how long they are supposed to sleep
      */
-    private static ArrayList<KThread> sleepQueue = new ArrayList<>();
-    private static HashMap<KThread, Long> sleepTimerMap = new HashMap<>();
+    private static ArrayList<KThread> sleepQueue = new ArrayList<>();;
+    private static HashMap<String, Long> sleepTimerMap = new HashMap<>();;
 }
