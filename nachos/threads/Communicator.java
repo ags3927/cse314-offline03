@@ -1,7 +1,5 @@
 package nachos.threads;
 
-import nachos.machine.*;
-
 /**
  * A <i>communicator</i> allows threads to synchronously exchange 32-bit
  * messages. Multiple threads can be waiting to <i>speak</i>,
@@ -36,7 +34,7 @@ public class Communicator {
 
         this.communicateLock.acquire();
 
-        while (hasSpoken){
+        while (hasSpoken) {
             this.communicateLock.release();
             this.speakCondition.sleep();
             this.communicateLock.acquire();
@@ -60,7 +58,7 @@ public class Communicator {
 
         this.communicateLock.acquire();
 
-        while (!hasSpoken) {   /// I'm quite confused -_-
+        while (!hasSpoken) {   /// I'm right ^w^
             this.communicateLock.release();
             this.listenCondition.sleep();
             this.communicateLock.acquire();
