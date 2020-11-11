@@ -1,10 +1,11 @@
 package nachos.threads;
 
+import nachos.machine.Lib;
+import nachos.machine.Machine;
+
+import javax.crypto.Mac;
 import java.util.ArrayList;
 import java.util.HashMap;
-
-import jdk.nashorn.internal.ir.IfNode;
-import nachos.machine.*;
 
 /**
  * Uses the hardware timer to provide preemption, and to allow threads to sleep
@@ -33,7 +34,14 @@ public class Alarm {
      * run.
      */
     public void timerInterrupt() {
-        KThread.currentThread().yield();
+        for (KThread sleepingThread : sleepQueue) {
+            if (Machine.timer().getTime() > sleepTimerMap.get(sleepingThread)) {
+                boolean intStatus = Machine.interrupt().disable();
+                sleepingThread.ready();
+                Machine.interrupt().restore(intStatus);
+            }
+        }
+        KThread.yield();
     }
 
     /**
@@ -45,31 +53,25 @@ public class Alarm {
      * <blockquote> (current time) >= (WaitUntil called time)+(x) </blockquote>
      *
      * @param x the minimum number of clock ticks to wait.
-     *
      * @see nachos.machine.Timer#getTime()
      */
     public void waitUntil(long x) {
         // for now, cheat just to get something working (busy waiting is bad)
         long wakeTime = Machine.timer().getTime() + x;
 
-        boolean intStatus = Machine.interrupt().disable();
+        Lib.assertTrue(Machine.interrupt().disabled());
 
-        KThread.currentThread().sleep();
+        sleepQueue.add(KThread.currentThread());
+        sleepTimerMap.put(KThread.currentThread(), wakeTime);
 
-        Machine.interrupt().restore(intStatus);
-
-        Machine.timer().setInterruptHandler(new Runnable() {
-            public void run() {
-                setReadyWhenTime(wakeTime);
-            }
-        });
+        KThread.sleep();
 
     }
 
     /**
      * Check if the currentThread has slept for the intended duration after a call of waitUntil(long x).
      * If yes, add it to the readyQueue.
-     * 
+     *
      * @param wakeTime the time after which the currentThread should be added back to the readyQueue
      */
     public void setReadyWhenTime(long wakeTime) {
@@ -80,7 +82,6 @@ public class Alarm {
         }
 
     }
-
 
     private static ArrayList<KThread> sleepQueue = new ArrayList<>();
     private static HashMap<KThread, Long> sleepTimerMap = new HashMap<>();
