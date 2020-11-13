@@ -34,6 +34,8 @@ public class UserProcess {
         processIDLock.acquire();
         processID = processCounter++;
         processIDLock.release();
+
+        exitStatusLock = new Lock();
     }
 
     /**
@@ -572,6 +574,43 @@ public class UserProcess {
         }
     }
 
+    /**
+     * Terminate the current process immediately. Any open file descriptors
+     * belonging to the process are closed. Any children of the process no longer
+     * have a parent process.
+     *
+     * status is returned to the parent process as this process's exit status and
+     * can be collected using the join syscall. A process exiting normally should
+     * (but is not required to) set status to 0.
+     *
+     * exit() never returns.
+     * @param status The exit status of the current process
+     */
+    private void handleExit(int status) {
+
+        if (parentProcess != null)
+        {
+            parentProcess.exitStatusLock.acquire();
+            parentProcess.childProcessExitStatus.put(processID, status);
+            parentProcess.exitStatusLock.release();
+        }
+
+        unloadSections();
+
+        int numberOfChildProcesses = childProcesses.size();
+
+        for (int i = 0; i < numberOfChildProcesses; i++)
+        {
+            UserProcess childProcess = childProcesses.remove(0);
+            childProcess.parentProcess = null;
+        }
+
+        if (processID == 0) {
+            Kernel.kernel.terminate();
+        } else {
+            UThread.finish();
+        }
+    }
 
     private static final int
             syscallHalt = 0,
