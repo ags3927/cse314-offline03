@@ -5,6 +5,7 @@ import nachos.threads.*;
 import nachos.userprog.*;
 
 import java.io.EOFException;
+
 import java.nio.Buffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,16 +29,18 @@ public class UserProcess {
     public UserProcess() {
         int numPhysPages = Machine.processor().getNumPhysPages();
         pageTable = new TranslationEntry[numPhysPages];
-        for (int i = 0; i < numPhysPages; i++)
-            pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
-
+        for (int i=0; i<numPhysPages; i++)
+//            pageTable[i] = new TranslationEntry(i,i, true,false,false,false);
+            pageTable[i] = new TranslationEntry(-1,-1,false,false,false,false);  //// initiated pageTable for this process with invalid Translation entries
+    
         processIDLock.acquire();
         processID = processCounter++;
         processIDLock.release();
 
         exitStatusLock = new Lock();
     }
-
+  
+  
     /**
      * Allocate and return a new process of the correct class. The class name
      * is specified by the <tt>nachos.conf</tt> key
@@ -60,6 +63,7 @@ public class UserProcess {
     public boolean execute(String name, String[] args) {
         if (!load(name, args))
             return false;
+      
         new UThread(this).setName(name).fork();
 
         return true;
@@ -105,7 +109,6 @@ public class UserProcess {
             if (bytes[length] == 0)
                 return new String(bytes, 0, length);
         }
-
         return null;
     }
 
@@ -136,19 +139,72 @@ public class UserProcess {
      * @return the number of bytes successfully transferred.
      */
     public int readVirtualMemory(int vaddr, byte[] data, int offset,
-                                 int length) {
-        Lib.assertTrue(offset >= 0 && length >= 0 && offset + length <= data.length);
+    int length) {
+        Lib.assertTrue(offset >= 0 && length >= 0 && offset+length <= data.length);
+
+        if (numPages == 0) return 0;  //// no physical page allocated
 
         byte[] memory = Machine.processor().getMemory();
 
-        // for now, just assume that virtual addresses equal physical addresses
-        if (vaddr < 0 || vaddr >= memory.length)
-            return 0;
+//        // for now, just assume that virtual addresses equal physical addresses
+//        if (vaddr < 0 || vaddr >= memory.length)
+//            return 0;
+//
+//        int amount = Math.min(length, memory.length-vaddr);
+//        System.arraycopy(memory, vaddr, data, offset, amount);
 
-        int amount = Math.min(length, memory.length - vaddr);
-        System.arraycopy(memory, vaddr, data, offset, amount);
+        //// but life isn't a bed of roses :')
+        int transferredBytes = 0;
+        int vaddrEnd = vaddr + length -1;
 
-        return amount;
+        if (vaddr < 0 || vaddrEnd > Processor.makeAddress(numPages-1,pageSize-1)){
+            return 0;  //// virtual address must be within physical address limit
+        }
+
+        int startingPage = Processor.pageFromAddress(vaddr);
+        int endingPage = Processor.pageFromAddress(vaddrEnd);
+
+        for (int i=startingPage; i<= endingPage; i++){
+            if (i < 0 || i >= pageTable.length || !pageTable[i].valid){
+                transferredBytes = 0;
+                break;
+            }
+
+            int startingAddressForThisPage = Processor.makeAddress(i,0);
+            int endingAddressForThisPage = Processor.makeAddress(i, pageSize-1);
+
+            int transferredBytesForThisPage = 0;
+            int addressOffsetForThisPage;
+
+            if (vaddr >= startingAddressForThisPage && vaddrEnd <= endingAddressForThisPage){
+                //// this will hit the first page only
+                addressOffsetForThisPage = vaddr - startingAddressForThisPage;
+                transferredBytesForThisPage = length;
+
+            } else if (vaddr >= startingAddressForThisPage && vaddrEnd > endingAddressForThisPage){
+                //// this will hit the first page and continue further
+                addressOffsetForThisPage = vaddr - startingAddressForThisPage;
+                transferredBytes = endingAddressForThisPage - vaddr + 1;
+
+            } else if (vaddr < startingAddressForThisPage && vaddrEnd <= endingAddressForThisPage){
+                //// after it comes to second page and then so on
+                //// if it ends in this page
+                addressOffsetForThisPage = 0;
+                transferredBytesForThisPage = vaddrEnd - startingAddressForThisPage + 1;
+
+            } else {
+                //// if it doesnt end in this page
+                addressOffsetForThisPage = 0;
+                transferredBytesForThisPage = endingAddressForThisPage - startingAddressForThisPage + 1;
+            }
+
+            int physicalPageAddressForThisPage = Processor.makeAddress(pageTable[i].ppn,addressOffsetForThisPage);
+            System.arraycopy(memory,physicalPageAddressForThisPage,data,offset+transferredBytes,transferredBytesForThisPage);
+
+            transferredBytes += transferredBytesForThisPage;
+        }
+
+        return transferredBytes;
     }
 
     /**
@@ -179,21 +235,104 @@ public class UserProcess {
      * @return the number of bytes successfully transferred.
      */
     public int writeVirtualMemory(int vaddr, byte[] data, int offset,
-                                  int length) {
-        Lib.assertTrue(offset >= 0 && length >= 0 && offset + length <= data.length);
+    int length) {
+//        Lib.assertTrue(offset >= 0 && length >= 0 && offset+length <= data.length);
+//
+//        byte[] memory = Machine.processor().getMemory();
+//
+//        // for now, just assume that virtual addresses equal physical addresses
+//        if (vaddr < 0 || vaddr >= memory.length)
+//            return 0;
+//
+//        int amount = Math.min(length, memory.length-vaddr);
+//        System.arraycopy(data, offset, memory, vaddr, amount);
+//
+//        return amount;
+
+        Lib.assertTrue(offset >= 0 && length >= 0 && offset+length <= data.length);
+
+        if (numPages == 0) return 0;  //// no physical page allocated
 
         byte[] memory = Machine.processor().getMemory();
 
-        // for now, just assume that virtual addresses equal physical addresses
-        if (vaddr < 0 || vaddr >= memory.length)
-            return 0;
+//        // for now, just assume that virtual addresses equal physical addresses
+//        if (vaddr < 0 || vaddr >= memory.length)
+//            return 0;
+//
+//        int amount = Math.min(length, memory.length-vaddr);
+//        System.arraycopy(memory, vaddr, data, offset, amount);
 
-        int amount = Math.min(length, memory.length - vaddr);
-        System.arraycopy(data, offset, memory, vaddr, amount);
+        //// but life isn't a bed of roses :')
+        int transferredBytes = 0;
+        int vaddrEnd = vaddr + length -1;
 
-        return amount;
+        if (vaddr < 0 || vaddrEnd > Processor.makeAddress(numPages-1,pageSize-1)){
+            return 0;  //// virtual address must be within physical address limit
+        }
+
+        int startingPage = Processor.pageFromAddress(vaddr);
+        int endingPage = Processor.pageFromAddress(vaddrEnd);
+
+        for (int i=startingPage; i<= endingPage; i++){
+            if (i < 0 || i >= pageTable.length || !pageTable[i].valid){
+                transferredBytes = 0;
+                break;
+            }
+
+            int startingAddressForThisPage = Processor.makeAddress(i,0);
+            int endingAddressForThisPage = Processor.makeAddress(i, pageSize-1);
+
+            int transferredBytesForThisPage = 0;
+            int addressOffsetForThisPage;
+
+            if (vaddr >= startingAddressForThisPage && vaddrEnd <= endingAddressForThisPage){
+                //// this will hit the first page only
+                addressOffsetForThisPage = vaddr - startingAddressForThisPage;
+                transferredBytesForThisPage = length;
+
+            } else if (vaddr >= startingAddressForThisPage && vaddrEnd > endingAddressForThisPage){
+                //// this will hit the first page and continue further
+                addressOffsetForThisPage = vaddr - startingAddressForThisPage;
+                transferredBytes = endingAddressForThisPage - vaddr + 1;
+
+            } else if (vaddr < startingAddressForThisPage && vaddrEnd <= endingAddressForThisPage){
+                //// after it comes to second page and then so on
+                //// if it ends in this page
+                addressOffsetForThisPage = 0;
+                transferredBytesForThisPage = vaddrEnd - startingAddressForThisPage + 1;
+
+            } else {
+                //// if it doesnt end in this page
+                addressOffsetForThisPage = 0;
+                transferredBytesForThisPage = endingAddressForThisPage - startingAddressForThisPage + 1;
+            }
+
+            int physicalPageAddressForThisPage = Processor.makeAddress(pageTable[i].ppn,addressOffsetForThisPage);
+            System.arraycopy(data,offset+transferredBytes,memory,physicalPageAddressForThisPage,transferredBytesForThisPage);
+
+            transferredBytes += transferredBytesForThisPage;
+        }
+
+        return transferredBytes;
     }
 
+    //// helper function to simplify load() function
+    private boolean tryAllocate(int virtualPageNumber, int sectionLength, boolean readOnly){
+        if (virtualPageNumber+sectionLength-1 >= pageTable.length) {
+            return false;
+        }
+
+        for (int i=0; i<sectionLength; i++){
+            int physicalPage = UserKernel.getPhysicalPage();
+            if (physicalPage == -1){
+                return false;
+            }
+            pageTable[virtualPageNumber+i] = new TranslationEntry(virtualPageNumber+i, physicalPage, true, readOnly, false, false);
+            numPages++;
+        }
+        return true;
+    }
+    ////
     /**
      * Load the executable with the specified name into this process, and
      * prepare to pass it the specified arguments. Opens the executable, reads
@@ -222,21 +361,54 @@ public class UserProcess {
         }
 
         // make sure the sections are contiguous and start at page 0
+
+        //// trying to allocate physical pages for each section of the COFF, if failed clearing them all
+
         numPages = 0;
-        for (int s = 0; s < coff.getNumSections(); s++) {
+        for (int s=0; s<coff.getNumSections(); s++) {
             CoffSection section = coff.getSection(s);
             if (section.getFirstVPN() != numPages) {
                 coff.close();
                 Lib.debug(dbgProcess, "\tfragmented executable");
                 return false;
             }
-            numPages += section.getLength();
+
+            boolean hasAllocated = tryAllocate(numPages, section.getLength(), section.isReadOnly());
+
+            if (!hasAllocated){
+//                for (int i=0; i< pageTable.length; i++){
+//                    if (pageTable[i].valid){
+//                        UserKernel.addPhysicalPage(pageTable[i].ppn);
+//
+//                        pageTable[i].valid = false;
+//                        pageTable[i].readOnly = false;
+//                        pageTable[i].vpn = -1;
+//                        pageTable[i].ppn = -1;
+//                    }
+//                }
+//                numPages = 0;
+                unloadSections();
+                return false;
+            }
         }
+
+        ////
+
+//        numPages = 0;
+//        for (int s=0; s<coff.getNumSections(); s++) {
+//            CoffSection section = coff.getSection(s);
+//            if (section.getFirstVPN() != numPages) {
+//                coff.close();
+//                Lib.debug(dbgProcess, "\tfragmented executable");
+//                return false;
+//            }
+//            numPages += section.getLength();
+//        }
 
         // make sure the argv array will fit in one page
         byte[][] argv = new byte[args.length][];
         int argsSize = 0;
-        for (int i = 0; i < args.length; i++) {
+        for (int i=0; i<args.length; i++) {
             argv[i] = args[i].getBytes();
             // 4 bytes for argv[] pointer; then string plus one for null byte
             argsSize += 4 + argv[i].length + 1;
@@ -251,11 +423,50 @@ public class UserProcess {
         initialPC = coff.getEntryPoint();
 
         // next comes the stack; stack pointer initially points to top of it
-        numPages += stackPages;
-        initialSP = numPages * pageSize;
+
+        ////
+        boolean hasAllocatedStack = tryAllocate(numPages, stackPages, false);
+
+        if (!hasAllocatedStack){
+//            for (int i=0; i< pageTable.length; i++){
+//                if (pageTable[i].valid){
+//                    UserKernel.addPhysicalPage(pageTable[i].ppn);
+//
+//                    pageTable[i].valid = false;
+//                    pageTable[i].readOnly = false;
+//                    pageTable[i].vpn = -1;
+//                    pageTable[i].ppn = -1;
+//                }
+//            }
+//            numPages = 0;
+            unloadSections();
+            return false;
+        }
+        ////
+
+
+        initialSP = numPages*pageSize;
 
         // and finally reserve 1 page for arguments
-        numPages++;
+        ////
+        boolean hasAllocatedArguments = tryAllocate(numPages, 1, false);
+
+        if (!hasAllocatedArguments){
+//            for (int i=0; i<pageTable.length; i++){
+//                if (pageTable[i].valid){
+//                    UserKernel.addPhysicalPage(pageTable[i].ppn);
+//
+//                    pageTable[i].valid = false;
+//                    pageTable[i].readOnly = false;
+//                    pageTable[i].vpn = -1;
+//                    pageTable[i].ppn = -1;
+//                }
+//            }
+//            numPages = 0;
+            unloadSections();
+            return false;
+        }
+        ////
 
         if (!loadSections())
             return false;
@@ -266,15 +477,18 @@ public class UserProcess {
 
         this.argc = args.length;
         this.argv = entryOffset;
-
+      
         for (int i = 0; i < argv.length; i++) {
             byte[] stringOffsetBytes = Lib.bytesFromInt(stringOffset);
             Lib.assertTrue(writeVirtualMemory(entryOffset, stringOffsetBytes) == 4);
+
             entryOffset += 4;
             Lib.assertTrue(writeVirtualMemory(stringOffset, argv[i]) ==
                     argv[i].length);
             stringOffset += argv[i].length;
+
             Lib.assertTrue(writeVirtualMemory(stringOffset, new byte[]{0}) == 1);
+
             stringOffset += 1;
         }
 
@@ -296,17 +510,24 @@ public class UserProcess {
         }
 
         // load sections
+
         for (int s = 0; s < coff.getNumSections(); s++) {
+
             CoffSection section = coff.getSection(s);
 
             Lib.debug(dbgProcess, "\tinitializing " + section.getName()
                     + " section (" + section.getLength() + " pages)");
 
-            for (int i = 0; i < section.getLength(); i++) {
-                int vpn = section.getFirstVPN() + i;
+            for (int i=0; i<section.getLength(); i++) {
+                int vpn = section.getFirstVPN()+i;
 
-                // for now, just assume virtual addresses=physical addresses
-                section.loadPage(i, vpn);
+//                // for now, just assume virtual addresses=physical addresses
+//                section.loadPage(i, vpn);
+
+                //// but, life isn't a bed of roses, is it?
+                section.loadPage(i, pageTable[vpn].ppn);
+                ////
+
             }
         }
 
@@ -317,6 +538,17 @@ public class UserProcess {
      * Release any resources allocated by <tt>loadSections()</tt>.
      */
     protected void unloadSections() {
+        for (int i=0; i<pageTable.length; i++){
+            if (pageTable[i].valid){
+                UserKernel.addPhysicalPage(pageTable[i].ppn);
+
+                pageTable[i].valid = false;
+                pageTable[i].readOnly = false;
+                pageTable[i].vpn = -1;
+                pageTable[i].ppn = -1;
+            }
+        }
+        numPages = 0;
     }
 
     /**

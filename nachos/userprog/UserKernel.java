@@ -4,6 +4,8 @@ import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
 
+import java.util.LinkedList;
+
 /**
  * A kernel that can support multiple user processes.
  */
@@ -27,6 +29,9 @@ public class UserKernel extends ThreadedKernel {
 	Machine.processor().setExceptionHandler(new Runnable() {
 		public void run() { exceptionHandler(); }
 	    });
+
+	for (int i=0; i<numberOfPhysicalPages; i++)
+		physicalPageList.add(i);
     }
 
     /**
@@ -45,8 +50,7 @@ public class UserKernel extends ThreadedKernel {
 	    console.writeByte(c);
 	}
 	while (c != 'q');
-
-	System.out.println("");
+	System.out.println();
     }
 
     /**
@@ -107,9 +111,42 @@ public class UserKernel extends ThreadedKernel {
 	super.terminate();
     }
 
+    //// pageList access functions
+
+	public static int getPhysicalPage(){
+    	int pageReturned = -1;
+    	pageListLock.acquire();
+
+    	if (physicalPageList.size() > 0){
+    		pageReturned = physicalPageList.removeFirst();
+		}
+
+    	pageListLock.release();
+    	return pageReturned;
+	}
+
+	public static boolean addPhysicalPage(int pageNumber){ // if its a faulty page number , should I throw an error? or ignore?
+    	boolean pageAdded = false;
+    	pageListLock.acquire();
+
+    	if (pageNumber >=0 && pageNumber < numberOfPhysicalPages){
+    		physicalPageList.add(pageNumber);
+    		pageAdded = true;
+		}
+
+    	pageListLock.release();
+    	return pageAdded;
+	}
+
+	////
+
     /** Globally accessible reference to the synchronized console. */
     public static SynchConsole console;
 
     // dummy variables to make javac smarter
     private static Coff dummy1 = null;
+
+    private static int numberOfPhysicalPages = Machine.processor().getNumPhysPages();   //// fetch total available physical page count
+	private static LinkedList<Integer> physicalPageList = new LinkedList<>();  //// linked list to keep track of used and unused physical pages
+	private static Lock pageListLock = new Lock();  //// lock to synchronize access in the linked list of pages
 }
