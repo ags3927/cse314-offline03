@@ -5,6 +5,7 @@ import nachos.threads.*;
 import nachos.userprog.*;
 
 import java.io.EOFException;
+import java.util.ArrayList;
 
 /**
  * Encapsulates the state of a user process that is not contained in its
@@ -408,9 +409,80 @@ public class UserProcess {
         byte[] buffer = new byte[byteCount];
 
         int bytesWritten = fileDescriptor == 0 ? inputStream.write(buffer, 0, readVirtualMemory(virtualMemoryAddress, buffer, 0, byteCount))
-                                                : outputStream.write(buffer, 0, readVirtualMemory(virtualMemoryAddress, buffer, 0, byteCount));
+                : outputStream.write(buffer, 0, readVirtualMemory(virtualMemoryAddress, buffer, 0, byteCount));
 
         return (bytesWritten * (bytesWritten - byteCount)) == 0 ? bytesWritten : -1;
+    }
+
+    /**
+     *
+     * @param fileNameVirtualAddress The virtual address of the location where the file name is stored
+     * @param argc The number of arguments to be passed
+     * @param argvStartingVirtualAddress The virtual address of the location where the virtual address
+     *                                   of the first argument is stored
+     * @return The processID of the child process created within this method
+     */
+    private int handleExec(int fileNameVirtualAddress, int argc, int argvStartingVirtualAddress) {
+        if (fileNameVirtualAddress < 0) {
+            Lib.debug(dbgProcess, "handleExec: Invalid virtual address for filename");
+            return -1;
+        }
+
+        if (argc < 0) {
+            Lib.debug(dbgProcess, "handleExec: Invalid number of arguments");
+            return -1;
+        }
+
+        if (argvStartingVirtualAddress < 0) {
+            Lib.debug(dbgProcess, "handleExec: Invalid virtual address for the virtual address of first argument");
+            return -1;
+        }
+
+        String fileName = readVirtualMemoryString(fileNameVirtualAddress, MAX_STRING_SIZE);
+
+        if (fileName == null) {
+            Lib.debug(dbgProcess, "handleExec: File not found");
+            return -1;
+        }
+
+        if (!fileName.endsWith(".coff")) {
+            Lib.debug(dbgProcess, "handleExec: Incorrect file format");
+            return -1;
+        }
+
+        String[] arguments = new String[argc];
+
+        for (int i = 0; i < argc; i++) {
+            byte[] argAddressBuffer = new byte[4];
+
+            if (readVirtualMemory(argvStartingVirtualAddress + i * 4, argAddressBuffer) != 4) {
+                Lib.debug(dbgProcess, "handleExec: Invalid virtual address for argument");
+                return -1;
+            }
+            int argVirtualAddress = Lib.bytesToInt(argAddressBuffer, 0);
+
+            String argument = readVirtualMemoryString(argVirtualAddress, 256);
+
+            if (argument == null)
+            {
+                Lib.debug(dbgProcess, "handleExec: Argument is null");
+                return -1;
+            }
+
+            arguments[i] = argument;
+        }
+
+        UserProcess childProcess = UserProcess.newUserProcess();
+
+        if (!childProcess.execute(fileName, arguments)) {
+            Lib.debug(dbgProcess, "handleExec: Could not execute in child process");
+        }
+
+        childProcess.parentProcess = this;
+
+        childProcesses.add(childProcess);
+
+        return childProcess.processID;
     }
 
     private static final int
@@ -530,4 +602,10 @@ public class UserProcess {
     private static int processCounter = 0;
     private int processID;
     private static final int ROOT_PROCESS = 0;
+    private static final int MAX_STRING_SIZE = 64;
+
+
+    // Task-3 Variables
+    private ArrayList<UserProcess> childProcesses = new ArrayList<>();
+    private UserProcess parentProcess;
 }
