@@ -111,9 +111,18 @@ public class UserKernel extends ThreadedKernel {
 	super.terminate();
     }
 
-    //// pageList access functions
+    // pageList access functions
 
-	public static int getPhysicalPage(){
+	/**
+	 * Takes the first page from the list of available physical pages and returns its number.
+	 * This is used to fetch individual free physical pages for usage.
+	 * When a process requires more than one page, it will be required to call this method multiple times.
+	 * This enables the process to use the gaps created when pages are freed, since the pages are not necessarily
+	 * accessed in a block or sequential fashion.
+	 *
+	 * @return Returns a page number from the list of available physical pages. If not available, returns -1.
+	 */
+	public static int fetchPhysicalPage(){
     	int pageReturned = -1;
     	pageListLock.acquire();
 
@@ -125,6 +134,15 @@ public class UserKernel extends ThreadedKernel {
     	return pageReturned;
 	}
 
+	/**
+	 * When a physical page is freed, it can be added to the list of physical pages added to the Kernel.
+	 * This method enables the Kernel to utilize the gaps created due to freeing of physical pages because they
+	 * are stored as a Linked list and never assessed in a sequential or block-wise fashion.
+	 *
+	 * @param pageNumber The number of the page which is to be added to the list of available physical pages
+	 * @return Upon successful addition of the freed page to the list of available physical pages, returns true.
+	 * 		   Returns false if the pageNumber provided for addition is invalid.
+	 */
 	public static boolean addPhysicalPage(int pageNumber){ // if its a faulty page number , should I throw an error? or ignore?
     	boolean pageAdded = false;
     	pageListLock.acquire();
@@ -133,12 +151,9 @@ public class UserKernel extends ThreadedKernel {
     		physicalPageList.add(pageNumber);
     		pageAdded = true;
 		}
-
     	pageListLock.release();
     	return pageAdded;
 	}
-
-	////
 
     /** Globally accessible reference to the synchronized console. */
     public static SynchConsole console;
@@ -146,7 +161,7 @@ public class UserKernel extends ThreadedKernel {
     // dummy variables to make javac smarter
     private static Coff dummy1 = null;
 
-    private static int numberOfPhysicalPages = Machine.processor().getNumPhysPages();   //// fetch total available physical page count
-	private static LinkedList<Integer> physicalPageList = new LinkedList<>();  //// linked list to keep track of used and unused physical pages
-	private static Lock pageListLock = new Lock();  //// lock to synchronize access in the linked list of pages
+    private static int numberOfPhysicalPages = Machine.processor().getNumPhysPages();   // fetch total available physical page count
+	private static LinkedList<Integer> physicalPageList = new LinkedList<>();  // linked list to keep track of used and unused physical pages
+	private static Lock pageListLock = new Lock();  // lock to synchronize access in the linked list of pages
 }
