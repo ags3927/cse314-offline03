@@ -5,7 +5,10 @@ import nachos.threads.*;
 import nachos.userprog.*;
 
 import java.io.EOFException;
+
+import java.nio.Buffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * Encapsulates the state of a user process that is not contained in its
@@ -16,8 +19,8 @@ import java.util.ArrayList;
  * This class is extended by other classes to support additional functionality
  * (such as additional syscalls).
  *
- * @see	nachos.vm.VMProcess
- * @see	nachos.network.NetProcess
+ * @see nachos.vm.VMProcess
+ * @see nachos.network.NetProcess
  */
 public class UserProcess {
     /**
@@ -29,32 +32,38 @@ public class UserProcess {
         for (int i=0; i<numPhysPages; i++)
 //            pageTable[i] = new TranslationEntry(i,i, true,false,false,false);
             pageTable[i] = new TranslationEntry(-1,-1,false,false,false,false);  //// initiated pageTable for this process with invalid Translation entries
+    
+        processIDLock.acquire();
+        processID = processCounter++;
+        processIDLock.release();
+
+        exitStatusLock = new Lock();
     }
-
-
+  
+  
     /**
      * Allocate and return a new process of the correct class. The class name
      * is specified by the <tt>nachos.conf</tt> key
      * <tt>Kernel.processClassName</tt>.
      *
-     * @return	a new process of the correct class.
+     * @return a new process of the correct class.
      */
     public static UserProcess newUserProcess() {
-        return (UserProcess)Lib.constructObject(Machine.getProcessClassName());
+        return (UserProcess) Lib.constructObject(Machine.getProcessClassName());
     }
 
     /**
      * Execute the specified program with the specified arguments. Attempts to
      * load the program, and then forks a thread to run it.
      *
-     * @param	name	the name of the file containing the executable.
-     * @param	args	the arguments to pass to the executable.
-     * @return	<tt>true</tt> if the program was successfully executed.
+     * @param name the name of the file containing the executable.
+     * @param args the arguments to pass to the executable.
+     * @return <tt>true</tt> if the program was successfully executed.
      */
     public boolean execute(String name, String[] args) {
         if (!load(name, args))
             return false;
-
+      
         new UThread(this).setName(name).fork();
 
         return true;
@@ -82,25 +91,24 @@ public class UserProcess {
      * without including the null terminator. If no null terminator is found,
      * returns <tt>null</tt>.
      *
-     * @param	vaddr	the starting virtual address of the null-terminated
-     *			string.
-     * @param	maxLength	the maximum number of characters in the string,
-     *				not including the null terminator.
-     * @return	the string read, or <tt>null</tt> if no null terminator was
-     *		found.
+     * @param vaddr     the starting virtual address of the null-terminated
+     *                  string.
+     * @param maxLength the maximum number of characters in the string,
+     *                  not including the null terminator.
+     * @return the string read, or <tt>null</tt> if no null terminator was
+     * found.
      */
     public String readVirtualMemoryString(int vaddr, int maxLength) {
         Lib.assertTrue(maxLength >= 0);
 
-        byte[] bytes = new byte[maxLength+1];
+        byte[] bytes = new byte[maxLength + 1];
 
         int bytesRead = readVirtualMemory(vaddr, bytes);
 
-        for (int length=0; length<bytesRead; length++) {
+        for (int length = 0; length < bytesRead; length++) {
             if (bytes[length] == 0)
                 return new String(bytes, 0, length);
         }
-
         return null;
     }
 
@@ -108,9 +116,9 @@ public class UserProcess {
      * Transfer data from this process's virtual memory to all of the specified
      * array. Same as <tt>readVirtualMemory(vaddr, data, 0, data.length)</tt>.
      *
-     * @param	vaddr	the first byte of virtual memory to read.
-     * @param	data	the array where the data will be stored.
-     * @return	the number of bytes successfully transferred.
+     * @param vaddr the first byte of virtual memory to read.
+     * @param data  the array where the data will be stored.
+     * @return the number of bytes successfully transferred.
      */
     public int readVirtualMemory(int vaddr, byte[] data) {
         return readVirtualMemory(vaddr, data, 0, data.length);
@@ -123,12 +131,12 @@ public class UserProcess {
      * should return the number of bytes successfully copied (or zero if no
      * data could be copied).
      *
-     * @param	vaddr	the first byte of virtual memory to read.
-     * @param	data	the array where the data will be stored.
-     * @param	offset	the first byte to write in the array.
-     * @param	length	the number of bytes to transfer from virtual memory to
-     *			the array.
-     * @return	the number of bytes successfully transferred.
+     * @param vaddr  the first byte of virtual memory to read.
+     * @param data   the array where the data will be stored.
+     * @param offset the first byte to write in the array.
+     * @param length the number of bytes to transfer from virtual memory to
+     *               the array.
+     * @return the number of bytes successfully transferred.
      */
     public int readVirtualMemory(int vaddr, byte[] data, int offset,
     int length) {
@@ -204,9 +212,9 @@ public class UserProcess {
      * memory.
      * Same as <tt>writeVirtualMemory(vaddr, data, 0, data.length)</tt>.
      *
-     * @param	vaddr	the first byte of virtual memory to write.
-     * @param	data	the array containing the data to transfer.
-     * @return	the number of bytes successfully transferred.
+     * @param vaddr the first byte of virtual memory to write.
+     * @param data  the array containing the data to transfer.
+     * @return the number of bytes successfully transferred.
      */
     public int writeVirtualMemory(int vaddr, byte[] data) {
         return writeVirtualMemory(vaddr, data, 0, data.length);
@@ -219,12 +227,12 @@ public class UserProcess {
      * should return the number of bytes successfully copied (or zero if no
      * data could be copied).
      *
-     * @param	vaddr	the first byte of virtual memory to write.
-     * @param	data	the array containing the data to transfer.
-     * @param	offset	the first byte to transfer from the array.
-     * @param	length	the number of bytes to transfer from the array to
-     *			virtual memory.
-     * @return	the number of bytes successfully transferred.
+     * @param vaddr  the first byte of virtual memory to write.
+     * @param data   the array containing the data to transfer.
+     * @param offset the first byte to transfer from the array.
+     * @param length the number of bytes to transfer from the array to
+     *               virtual memory.
+     * @return the number of bytes successfully transferred.
      */
     public int writeVirtualMemory(int vaddr, byte[] data, int offset,
     int length) {
@@ -331,9 +339,9 @@ public class UserProcess {
      * its header information, and copies sections and arguments into this
      * process's virtual memory.
      *
-     * @param	name	the name of the file containing the executable.
-     * @param	args	the arguments to pass to the executable.
-     * @return	<tt>true</tt> if the executable was successfully loaded.
+     * @param name the name of the file containing the executable.
+     * @param args the arguments to pass to the executable.
+     * @return <tt>true</tt> if the executable was successfully loaded.
      */
     private boolean load(String name, String[] args) {
         Lib.debug(dbgProcess, "UserProcess.load(\"" + name + "\")");
@@ -346,8 +354,7 @@ public class UserProcess {
 
         try {
             coff = new Coff(executable);
-        }
-        catch (EOFException e) {
+        } catch (EOFException e) {
             executable.close();
             Lib.debug(dbgProcess, "\tcoff load failed");
             return false;
@@ -416,6 +423,7 @@ public class UserProcess {
         initialPC = coff.getEntryPoint();
 
         // next comes the stack; stack pointer initially points to top of it
+
         ////
         boolean hasAllocatedStack = tryAllocate(numPages, stackPages, false);
 
@@ -464,20 +472,23 @@ public class UserProcess {
             return false;
 
         // store arguments in last page
-        int entryOffset = (numPages-1)*pageSize;
-        int stringOffset = entryOffset + args.length*4;
+        int entryOffset = (numPages - 1) * pageSize;
+        int stringOffset = entryOffset + args.length * 4;
 
         this.argc = args.length;
         this.argv = entryOffset;
-
-        for (int i=0; i<argv.length; i++) {
+      
+        for (int i = 0; i < argv.length; i++) {
             byte[] stringOffsetBytes = Lib.bytesFromInt(stringOffset);
-            Lib.assertTrue(writeVirtualMemory(entryOffset,stringOffsetBytes) == 4);
+            Lib.assertTrue(writeVirtualMemory(entryOffset, stringOffsetBytes) == 4);
+
             entryOffset += 4;
             Lib.assertTrue(writeVirtualMemory(stringOffset, argv[i]) ==
                     argv[i].length);
             stringOffset += argv[i].length;
-            Lib.assertTrue(writeVirtualMemory(stringOffset,new byte[] { 0 }) == 1);
+
+            Lib.assertTrue(writeVirtualMemory(stringOffset, new byte[]{0}) == 1);
+
             stringOffset += 1;
         }
 
@@ -489,7 +500,7 @@ public class UserProcess {
      * memory. If this returns successfully, the process will definitely be
      * run (this is the last step in process initialization that can fail).
      *
-     * @return	<tt>true</tt> if the sections were successfully loaded.
+     * @return <tt>true</tt> if the sections were successfully loaded.
      */
     protected boolean loadSections() {
         if (numPages > Machine.processor().getNumPhysPages()) {
@@ -499,7 +510,9 @@ public class UserProcess {
         }
 
         // load sections
-        for (int s=0; s<coff.getNumSections(); s++) {
+
+        for (int s = 0; s < coff.getNumSections(); s++) {
+
             CoffSection section = coff.getSection(s);
 
             Lib.debug(dbgProcess, "\tinitializing " + section.getName()
@@ -514,6 +527,7 @@ public class UserProcess {
                 //// but, life isn't a bed of roses, is it?
                 section.loadPage(i, pageTable[vpn].ppn);
                 ////
+
             }
         }
 
@@ -548,7 +562,7 @@ public class UserProcess {
         Processor processor = Machine.processor();
 
         // by default, everything's 0
-        for (int i=0; i<processor.numUserRegisters; i++)
+        for (int i = 0; i < Processor.numUserRegisters; i++)
             processor.writeRegister(i, 0);
 
         // initialize PC and SP according
@@ -564,23 +578,271 @@ public class UserProcess {
      * Handle the halt() system call.
      */
     private int handleHalt() {
+        if (processID != ROOT_PROCESS) return -1;
 
         Machine.halt();
 
         Lib.assertNotReached("Machine.halt() did not halt machine!");
+
         return 0;
     }
 
-    //// release all the physical pages while exiting ot terminating
+    /**
+     * Attempt to read up to count bytes into buffer from the file or stream
+     * referred to by fileDescriptor.
+     * <p>
+     * On success, the number of bytes read is returned. If the file descriptor
+     * refers to a file on disk, the file position is advanced by this number.
+     * <p>
+     * It is not necessarily an error if this number is smaller than the number of
+     * bytes requested. If the file descriptor refers to a file on disk, this
+     * indicates that the end of the file has been reached. If the file descriptor
+     * refers to a stream, this indicates that the fewer bytes are actually
+     * available right now than were requested, but more bytes may become available
+     * in the future. Note that read() never waits for a stream to have more data;
+     * it always returns as much as possible immediately.
+     * <p>
+     * On error, -1 is returned, and the new file position is undefined. This can
+     * happen if fileDescriptor is invalid, if part of the buffer is read-only or
+     * invalid, or if a network stream has been terminated by the remote host and
+     * no more data is available.
+     *
+     * @param fileDescriptor       the integer indexing the file from which to read
+     * @param virtualMemoryAddress the virtual memory address where the read bytes are to be stored
+     * @param byteCount            the number of bytes to be read
+     * @return Returns -1 upon failure. Returns the number of bytes that have been read upon success.
+     */
+    private int handleRead(int fileDescriptor, int virtualMemoryAddress, int byteCount) {
+        if (fileDescriptor > 1 || fileDescriptor < 0 || byteCount < 0) return -1;
 
-    private int handleExit(int status) {
-        //// aniruddha need to add codes here too
+        byte[] buffer = new byte[byteCount];
+
+        int bytesRead = fileDescriptor == 0 ? inputStream.read(buffer, 0, byteCount) : outputStream.read(buffer, 0, byteCount);
+
+        if ((bytesRead * bytesRead + bytesRead) == 0) return -1;
+
+        return writeVirtualMemory(virtualMemoryAddress, buffer, 0, bytesRead);
+    }
+
+
+    /**
+     * Attempt to write up to count bytes from buffer to the file or stream
+     * referred to by fileDescriptor. write() can return before the bytes are
+     * actually flushed to the file or stream. A write to a stream can block,
+     * however, if kernel queues are temporarily full.
+     * <p>
+     * On success, the number of bytes written is returned (zero indicates nothing
+     * was written), and the file position is advanced by this number. It IS an
+     * error if this number is smaller than the number of bytes requested. For
+     * disk files, this indicates that the disk is full. For streams, this
+     * indicates the stream was terminated by the remote host before all the data
+     * was transferred.
+     * <p>
+     * On error, -1 is returned, and the new file position is undefined. This can
+     * happen if fileDescriptor is invalid, if part of the buffer is invalid, or
+     * if a network stream has already been terminated by the remote host.
+     */
+    private int handleWrite(int fileDescriptor, int virtualMemoryAddress, int byteCount) {
+        if (fileDescriptor > 1 || fileDescriptor < 0 || byteCount < 0) return -1;
+
+        byte[] buffer = new byte[byteCount];
+
+        int bytesWritten = fileDescriptor == 0 ? inputStream.write(buffer, 0, readVirtualMemory(virtualMemoryAddress, buffer, 0, byteCount))
+                : outputStream.write(buffer, 0, readVirtualMemory(virtualMemoryAddress, buffer, 0, byteCount));
+
+        return (bytesWritten * (bytesWritten - byteCount)) == 0 ? bytesWritten : -1;
+    }
+
+    /**
+     * Execute the program stored in the specified file, with the specified
+     * arguments, in a new child process. The child process has a new unique
+     * process ID, and starts with stdin opened as file descriptor 0, and stdout
+     * opened as file descriptor 1.
+     * <p>
+     * file is a null-terminated string that specifies the name of the file
+     * containing the executable. Note that this string must include the ".coff"
+     * extension.
+     * <p>
+     * argc specifies the number of arguments to pass to the child process. This
+     * number must be non-negative.
+     * <p>
+     * argv is an array of pointers to null-terminated strings that represent the
+     * arguments to pass to the child process. argv[0] points to the first
+     * argument, and argv[argc-1] points to the last argument.
+     * <p>
+     * exec() returns the child process's process ID, which can be passed to
+     * join(). On error, returns -1.
+     *
+     * @param fileNameVirtualAddress     The virtual address of the location where the file name is stored
+     * @param argc                       The number of arguments to be passed
+     * @param argvStartingVirtualAddress The virtual address of the location where the virtual address
+     *                                   of the first argument is stored
+     * @return The processID of the child process created within this method
+     */
+    private int handleExec(int fileNameVirtualAddress, int argc, int argvStartingVirtualAddress) {
+        if (fileNameVirtualAddress < 0) {
+            Lib.debug(dbgProcess, "handleExec: Invalid virtual address for filename");
+            return -1;
+        }
+
+        if (argc < 0) {
+            Lib.debug(dbgProcess, "handleExec: Invalid number of arguments");
+            return -1;
+        }
+
+        if (argvStartingVirtualAddress < 0) {
+            Lib.debug(dbgProcess, "handleExec: Invalid virtual address for the virtual address of first argument");
+            return -1;
+        }
+
+        String fileName = readVirtualMemoryString(fileNameVirtualAddress, MAX_STRING_SIZE);
+
+        if (fileName == null) {
+            Lib.debug(dbgProcess, "handleExec: File not found");
+            return -1;
+        }
+
+        if (!fileName.endsWith(".coff")) {
+            Lib.debug(dbgProcess, "handleExec: Incorrect file format");
+            return -1;
+        }
+
+        String[] arguments = new String[argc];
+
+        for (int i = 0; i < argc; i++) {
+            byte[] argAddressBuffer = new byte[4];
+
+            if (readVirtualMemory(argvStartingVirtualAddress + i * 4, argAddressBuffer) != 4) {
+                Lib.debug(dbgProcess, "handleExec: Invalid virtual address for argument");
+                return -1;
+            }
+            int argVirtualAddress = Lib.bytesToInt(argAddressBuffer, 0);
+
+            String argument = readVirtualMemoryString(argVirtualAddress, 256);
+
+            if (argument == null) {
+                Lib.debug(dbgProcess, "handleExec: Argument is null");
+                return -1;
+            }
+
+            arguments[i] = argument;
+        }
+
+        UserProcess childProcess = UserProcess.newUserProcess();
+
+        if (!childProcess.execute(fileName, arguments)) {
+            Lib.debug(dbgProcess, "handleExec: Could not execute in child process");
+        }
+
+        childProcess.parentProcess = this;
+
+        childProcesses.add(childProcess);
+
+        return childProcess.processID;
+    }
+
+    /**
+     * Suspend execution of the current process until the child process specified
+     * by the processID argument has exited. If the child has already exited by the
+     * time of the call, returns immediately. When the current process resumes, it
+     * disowns the child process, so that join() cannot be used on that process
+     * again.
+     * <p>
+     * processID is the process ID of the child process, returned by exec().
+     * <p>
+     * status points to an integer where the exit status of the child process will
+     * be stored. This is the value the child passed to exit(). If the child exited
+     * because of an unhandled exception, the value stored is not defined.
+     * <p>
+     * If the child exited normally, returns 1. If the child exited as a result of
+     * an unhandled exception, returns 0. If processID does not refer to a child
+     * process of the current process, returns -1.
+     */
+    private int handleJoin(int childProcessID, int virtualAddressOfChildExitStatus) {
+        if (processID < 0) {
+            Lib.debug(dbgProcess, "handleJoin: Invalid ID for child process");
+            return -1;
+        }
+
+        if (virtualAddressOfChildExitStatus < 0) {
+            Lib.debug(dbgProcess, "handleJoin: Invalid virtual address for storing the exit status of child process");
+            return -1;
+        }
+
+        UserProcess childProcess = null;
+
+        int numberOfChildProcesses = childProcesses.size();
+
+        for (int i = 0; i < numberOfChildProcesses; i++) {
+            if (childProcesses.get(i).processID == childProcessID) {
+                childProcess = childProcesses.get(i);
+                break;
+            }
+        }
+
+        if (childProcess == null) {
+            Lib.debug(dbgProcess, "handleJoin: Child process with provided processID does not exist");
+            return -1;
+        }
+
+        childProcess.processThread.join();
+        childProcess.parentProcess = null;
+        childProcesses.remove(childProcess);
+
+        exitStatusLock.acquire();
+        Integer status = childProcessExitStatus.get(childProcessID);
+        exitStatusLock.release();
+
+        if (status == null) {
+            Lib.debug(dbgProcess, "handleJoin: Child process exited through an unhandled exception");
+            return 0;
+        } else {
+            if (writeVirtualMemory(virtualAddressOfChildExitStatus, Lib.bytesFromInt(status) ) == 4) {
+                return 1;
+            } else {
+                Lib.debug(dbgProcess, "handleJoin: Could not write exit status of child to specified virtual address");
+                return 0;
+            }
+        }
+    }
+
+    /**
+     * Terminate the current process immediately. Any open file descriptors
+     * belonging to the process are closed. Any children of the process no longer
+     * have a parent process.
+     *
+     * status is returned to the parent process as this process's exit status and
+     * can be collected using the join syscall. A process exiting normally should
+     * (but is not required to) set status to 0.
+     *
+     * exit() never returns.
+     * @param status The exit status of the current process
+     */
+    private void handleExit(int status) {
+
+        if (parentProcess != null)
+        {
+            parentProcess.exitStatusLock.acquire();
+            parentProcess.childProcessExitStatus.put(processID, status);
+            parentProcess.exitStatusLock.release();
+        }
+
         unloadSections();
-        return 0;
+
+        int numberOfChildProcesses = childProcesses.size();
+
+        for (int i = 0; i < numberOfChildProcesses; i++)
+        {
+            UserProcess childProcess = childProcesses.remove(0);
+            childProcess.parentProcess = null;
+        }
+
+        if (processID == 0) {
+            Kernel.kernel.terminate();
+        } else {
+            UThread.finish();
+        }
     }
-
-    ////
-
 
     private static final int
             syscallHalt = 0,
@@ -608,26 +870,28 @@ public class UserProcess {
      * <tr><td>4</td><td><tt>int  creat(char *name);</tt></td></tr>
      * <tr><td>5</td><td><tt>int  open(char *name);</tt></td></tr>
      * <tr><td>6</td><td><tt>int  read(int fd, char *buffer, int size);
-     *								</tt></td></tr>
+     * 								</tt></td></tr>
      * <tr><td>7</td><td><tt>int  write(int fd, char *buffer, int size);
-     *								</tt></td></tr>
+     * 								</tt></td></tr>
      * <tr><td>8</td><td><tt>int  close(int fd);</tt></td></tr>
      * <tr><td>9</td><td><tt>int  unlink(char *name);</tt></td></tr>
      * </table>
      *
-     * @param	syscall	the syscall number.
-     * @param	a0	the first syscall argument.
-     * @param	a1	the second syscall argument.
-     * @param	a2	the third syscall argument.
-     * @param	a3	the fourth syscall argument.
-     * @return	the value to be returned to the user.
+     * @param syscall the syscall number.
+     * @param a0      the first syscall argument.
+     * @param a1      the second syscall argument.
+     * @param a2      the third syscall argument.
+     * @param a3      the fourth syscall argument.
+     * @return the value to be returned to the user.
      */
     public int handleSyscall(int syscall, int a0, int a1, int a2, int a3) {
         switch (syscall) {
             case syscallHalt:
                 return handleHalt();
-
-
+            case syscallRead:
+                return handleRead(a0, a1, a2);
+            case syscallWrite:
+                return handleWrite(a0, a1, a2);
             default:
                 Lib.debug(dbgProcess, "Unknown syscall " + syscall);
                 Lib.assertNotReached("Unknown system call!");
@@ -641,7 +905,7 @@ public class UserProcess {
      * <i>cause</i> argument identifies which exception occurred; see the
      * <tt>Processor.exceptionZZZ</tt> constants.
      *
-     * @param	cause	the user exception that occurred.
+     * @param cause the user exception that occurred.
      */
     public void handleException(int cause) {
         Processor processor = Machine.processor();
@@ -665,15 +929,23 @@ public class UserProcess {
         }
     }
 
-    /** The program being run by this process. */
+    /**
+     * The program being run by this process.
+     */
     protected Coff coff;
 
-    /** This process's page table. */
+    /**
+     * This process's page table.
+     */
     protected TranslationEntry[] pageTable;
-    /** The number of contiguous pages occupied by the program. */
+    /**
+     * The number of contiguous pages occupied by the program.
+     */
     protected int numPages;
 
-    /** The number of pages in the program's stack. */
+    /**
+     * The number of pages in the program's stack.
+     */
     protected final int stackPages = 8;
 
     private int initialPC, initialSP;
@@ -681,4 +953,22 @@ public class UserProcess {
 
     private static final int pageSize = Processor.pageSize;
     private static final char dbgProcess = 'a';
+
+
+    // Task-1 Variables
+    private final OpenFile inputStream = UserKernel.console.openForReading();
+    private final OpenFile outputStream = UserKernel.console.openForWriting();
+    private static int processCounter = 0;
+    private int processID;
+    private static final int ROOT_PROCESS = 0;
+    private static final int MAX_STRING_SIZE = 64;
+
+    protected Lock processIDLock = new Lock();
+
+    // Task-3 Variables
+    private ArrayList<UserProcess> childProcesses = new ArrayList<>();
+    private UserProcess parentProcess;
+    private Lock exitStatusLock;
+    private HashMap<Integer, Integer> childProcessExitStatus = new HashMap<>();
+    protected UThread processThread;
 }

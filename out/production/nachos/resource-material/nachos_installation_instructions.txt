@@ -1,0 +1,141 @@
+Steps to install nachos-java
+
+1. Install jdk
+2. Add gmake
+3. Download and extract nachos
+4. Add nachos to PATH
+5. Compile and run nachos
+
+
+
+Supplementary:
+
+1. Running nachos from Netbeans
+2. Installing MIPS Cross-compiler
+
+
+
+
+----------------
+1. Install jdk
+----------------
+a) Download the jdk 11 from: https://www.oracle.com/java/technologies/javase-jdk11-downloads.html
+
+jdk 15 won't work.
+
+b) Extract the jdk you downloaded
+tar zxvf jdk_file_name -C __folder-name___
+
+c) Check by going to that folder
+
+d) Set the jdk as default
+
+sudo update-alternatives --install /usr/bin/java java /usr/lib/jvm/java-1.11.0-openjdk-amd64/bin/java 1800
+sudo update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/java-1.11.0-openjdk-amd64/bin/javac 1800
+
+e) Test
+
+java -version
+javac -version
+
+
+
+
+
+
+---------------
+2. Add gmake
+---------------
+gmake is make for GNU systems. To work:
+
+sudo ln -s /usr/bin/make /usr/bin/gmake
+
+
+
+
+
+
+---------------------------------
+3. Download and extract nachos
+---------------------------------
+
+Download link: https://people.eecs.berkeley.edu/~kubitron/courses/cs162-F10/Nachos/nachos-java.tar.gz
+
+Keep it somewhere.
+
+Extract command:   gzcat nachos-java.tar.gz | tar xf -
+
+
+
+
+
+
+
+----------------------
+4. Add nachos to PATH
+----------------------
+Go to the nachos directory (where you extracted nachos). Then, navigate to the bin directory and copy the path. We need to add that to our PATH variable.
+
+a) sudo gedit /etc/profile
+b) add this line to the end: export PATH=$PATH:___PATH_TO_NACHOS_BIN___
+c) logout and login (so that these take effect)
+
+
+
+
+
+
+
+
+--------------------------
+5. Compile and run nachos
+--------------------------
+a) cd to proj1 directory
+b) gmake
+c) Open the Makefile in nachos
+d) add the option '-Xlint' to the javac command
+e) cd to proj1 directory
+f) gmake
+g) nachos
+
+
+
+
+
+
+
+
+Supplementary 1: Run Nachos from Netbeans
+--------------------------------------------
+* No Makefile is there
+* No configuration file is there
+* These must be there manually
+
+a) Open project -> Java Project with Existing Source -> Select the nachos files
+b) Set working directory in properties: conf file is in that
+c) Add the option '-Xlint' in compiling options
+
+
+
+
+
+
+Supplementary 2: Installing MIPS Cross-compiler
+-------------------------------------------------
+A cross-compiler is a compiler that runs on one architecture but compiles to another architecture, e.g. a compiler that runs on x86 Solaris machines such as torus.cs but builds MIPS programs.
+
+a) Download linux cross-compiler from: https://inst.eecs.berkeley.edu/~cs162/fa13/Nachos/xgcc.html
+
+b) Unzip
+
+c) Add the unzipped directory path to ARCHDIR and PATH. To do so, open /etc/profile
+
+sudo gedit /etc/profile
+
+d) Write these two lines:
+
+export ARCHDIR=path_to_mips_unzipped_directory
+export PATH=$PATH:$ARCHDIR
+
+e) Log out and log in
+
