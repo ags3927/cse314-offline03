@@ -45,7 +45,7 @@ public class Alarm {
             if (time >= sleepTimerMap.get(sleepQueue.get(i).toString())) {
                 sleepQueue.get(i).ready();
 
-                System.out.println(sleepQueue.get(i).getName() + " waited for at least " + sleepTimerMap.get(sleepQueue.get(i).toString()) + " ticks and has been woken up at " + time);
+//                System.out.println(sleepQueue.get(i).getName() + " waited for at least " + sleepTimerMap.get(sleepQueue.get(i).toString()) + " ticks and has been woken up at " + time);
                 sleepTimerMap.remove(sleepQueue.get(i).toString());
                 sleepQueue.remove(i);
                 i--;
@@ -80,7 +80,7 @@ public class Alarm {
 
         sleepTimerMap.put(KThread.currentThread().toString(), wakeTime);
 
-        System.out.println(KThread.currentThread().getName() + " is being sent to sleep at " + currentTime + " for " + x + " ticks");
+//        System.out.println(KThread.currentThread().getName() + " is being sent to sleep at " + currentTime + " for " + x + " ticks");
 
         KThread.sleep();
 
