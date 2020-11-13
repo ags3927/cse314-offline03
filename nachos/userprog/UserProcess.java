@@ -27,8 +27,7 @@ public class UserProcess {
         pageTable = new TranslationEntry[numPhysPages];
         for (int i = 0; i < numPhysPages; i++)
             pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
-
-        files = new OpenFile[27];
+        processID = processCounter++;
     }
 
     /**
@@ -53,7 +52,6 @@ public class UserProcess {
     public boolean execute(String name, String[] args) {
         if (!load(name, args))
             return false;
-
         new UThread(this).setName(name).fork();
 
         return true;
@@ -340,10 +338,12 @@ public class UserProcess {
      * Handle the halt() system call.
      */
     private int handleHalt() {
+        if (processID != ROOT_PROCESS) return -1;
 
         Machine.halt();
 
         Lib.assertNotReached("Machine.halt() did not halt machine!");
+
         return 0;
     }
 
@@ -367,18 +367,51 @@ public class UserProcess {
      * invalid, or if a network stream has been terminated by the remote host and
      * no more data is available.
      *
-     * @param fileDescriptor the integer indexing the file from which to read
-     * @param bufferAddress the address to the buffer where the read bytes are to be stored
-     * @param count the number of bytes to be read
+     * @param fileDescriptor       the integer indexing the file from which to read
+     * @param virtualMemoryAddress the virtual memory address where the read bytes are to be stored
+     * @param byteCount            the number of bytes to be read
      * @return Returns -1 upon failure. Returns the number of bytes that have been read upon success.
      */
-    private int handleRead(int fileDescriptor, int bufferAddress, int count) {
-        if (fileDescriptor >= files.length || fileDescriptor < 0 || count < 0 || files[fileDescriptor] == null) return -1;
+    private int handleRead(int fileDescriptor, int virtualMemoryAddress, int byteCount) {
+        if (fileDescriptor > 1 || fileDescriptor < 0 || byteCount < 0) return -1;
 
+        byte[] buffer = new byte[byteCount];
 
-        return 0;
+        int bytesRead = fileDescriptor == 0 ? inputStream.read(buffer, 0, byteCount) : outputStream.read(buffer, 0, byteCount);
+
+        if ((bytesRead * bytesRead + bytesRead) == 0) return -1;
+
+        return writeVirtualMemory(virtualMemoryAddress, buffer, 0, bytesRead);
     }
 
+
+    /**
+     * Attempt to write up to count bytes from buffer to the file or stream
+     * referred to by fileDescriptor. write() can return before the bytes are
+     * actually flushed to the file or stream. A write to a stream can block,
+     * however, if kernel queues are temporarily full.
+     * <p>
+     * On success, the number of bytes written is returned (zero indicates nothing
+     * was written), and the file position is advanced by this number. It IS an
+     * error if this number is smaller than the number of bytes requested. For
+     * disk files, this indicates that the disk is full. For streams, this
+     * indicates the stream was terminated by the remote host before all the data
+     * was transferred.
+     * <p>
+     * On error, -1 is returned, and the new file position is undefined. This can
+     * happen if fileDescriptor is invalid, if part of the buffer is invalid, or
+     * if a network stream has already been terminated by the remote host.
+     */
+    private int handleWrite(int fileDescriptor, int virtualMemoryAddress, int byteCount) {
+        if (fileDescriptor > 1 || fileDescriptor < 0 || byteCount < 0) return -1;
+
+        byte[] buffer = new byte[byteCount];
+
+        int bytesWritten = fileDescriptor == 0 ? inputStream.write(buffer, 0, readVirtualMemory(virtualMemoryAddress, buffer, 0, byteCount))
+                                                : outputStream.write(buffer, 0, readVirtualMemory(virtualMemoryAddress, buffer, 0, byteCount));
+
+        return (bytesWritten * (bytesWritten - byteCount)) == 0 ? bytesWritten : -1;
+    }
 
     private static final int
             syscallHalt = 0,
@@ -424,8 +457,10 @@ public class UserProcess {
         switch (syscall) {
             case syscallHalt:
                 return handleHalt();
-
-
+            case syscallRead:
+                return handleRead(a0, a1, a2);
+            case syscallWrite:
+                return handleWrite(a0, a1, a2);
             default:
                 Lib.debug(dbgProcess, "Unknown syscall " + syscall);
                 Lib.assertNotReached("Unknown system call!");
@@ -490,7 +525,9 @@ public class UserProcess {
 
 
     // Task-1 Variables
-    private OpenFile[] files;
-
-
+    private final OpenFile inputStream = UserKernel.console.openForReading();
+    private final OpenFile outputStream = UserKernel.console.openForWriting();
+    private static int processCounter = 0;
+    private int processID;
+    private static final int ROOT_PROCESS = 0;
 }
