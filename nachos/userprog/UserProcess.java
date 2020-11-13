@@ -591,6 +591,11 @@ public class UserProcess {
      * On error, -1 is returned, and the new file position is undefined. This can
      * happen if fileDescriptor is invalid, if part of the buffer is invalid, or
      * if a network stream has already been terminated by the remote host.
+     *
+     * @param fileDescriptor       the integer indexing the file to which the data is to be written
+     * @param virtualMemoryAddress the virtual memory address where the bytes to be written are stored
+     * @param byteCount            the number of bytes to be written
+     * @return Returns -1 upon failure. Returns the number of bytes that have been written upon success.
      */
     private int handleWrite(int fileDescriptor, int virtualMemoryAddress, int byteCount) {
         if (fileDescriptor > 1 || fileDescriptor < 0 || byteCount < 0) return -1;
