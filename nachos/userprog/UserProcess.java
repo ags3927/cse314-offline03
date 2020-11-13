@@ -5,7 +5,9 @@ import nachos.threads.*;
 import nachos.userprog.*;
 
 import java.io.EOFException;
+import java.nio.Buffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * Encapsulates the state of a user process that is not contained in its
@@ -28,7 +30,10 @@ public class UserProcess {
         pageTable = new TranslationEntry[numPhysPages];
         for (int i = 0; i < numPhysPages; i++)
             pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
+
+        processIDLock.acquire();
         processID = processCounter++;
+        processIDLock.release();
     }
 
     /**
@@ -415,9 +420,27 @@ public class UserProcess {
     }
 
     /**
+     * Execute the program stored in the specified file, with the specified
+     * arguments, in a new child process. The child process has a new unique
+     * process ID, and starts with stdin opened as file descriptor 0, and stdout
+     * opened as file descriptor 1.
+     * <p>
+     * file is a null-terminated string that specifies the name of the file
+     * containing the executable. Note that this string must include the ".coff"
+     * extension.
+     * <p>
+     * argc specifies the number of arguments to pass to the child process. This
+     * number must be non-negative.
+     * <p>
+     * argv is an array of pointers to null-terminated strings that represent the
+     * arguments to pass to the child process. argv[0] points to the first
+     * argument, and argv[argc-1] points to the last argument.
+     * <p>
+     * exec() returns the child process's process ID, which can be passed to
+     * join(). On error, returns -1.
      *
-     * @param fileNameVirtualAddress The virtual address of the location where the file name is stored
-     * @param argc The number of arguments to be passed
+     * @param fileNameVirtualAddress     The virtual address of the location where the file name is stored
+     * @param argc                       The number of arguments to be passed
      * @param argvStartingVirtualAddress The virtual address of the location where the virtual address
      *                                   of the first argument is stored
      * @return The processID of the child process created within this method
@@ -463,8 +486,7 @@ public class UserProcess {
 
             String argument = readVirtualMemoryString(argVirtualAddress, 256);
 
-            if (argument == null)
-            {
+            if (argument == null) {
                 Lib.debug(dbgProcess, "handleExec: Argument is null");
                 return -1;
             }
@@ -484,6 +506,72 @@ public class UserProcess {
 
         return childProcess.processID;
     }
+
+    /**
+     * Suspend execution of the current process until the child process specified
+     * by the processID argument has exited. If the child has already exited by the
+     * time of the call, returns immediately. When the current process resumes, it
+     * disowns the child process, so that join() cannot be used on that process
+     * again.
+     * <p>
+     * processID is the process ID of the child process, returned by exec().
+     * <p>
+     * status points to an integer where the exit status of the child process will
+     * be stored. This is the value the child passed to exit(). If the child exited
+     * because of an unhandled exception, the value stored is not defined.
+     * <p>
+     * If the child exited normally, returns 1. If the child exited as a result of
+     * an unhandled exception, returns 0. If processID does not refer to a child
+     * process of the current process, returns -1.
+     */
+    private int handleJoin(int childProcessID, int virtualAddressOfChildExitStatus) {
+        if (processID < 0) {
+            Lib.debug(dbgProcess, "handleJoin: Invalid ID for child process");
+            return -1;
+        }
+
+        if (virtualAddressOfChildExitStatus < 0) {
+            Lib.debug(dbgProcess, "handleJoin: Invalid virtual address for storing the exit status of child process");
+            return -1;
+        }
+
+        UserProcess childProcess = null;
+
+        int numberOfChildProcesses = childProcesses.size();
+
+        for (int i = 0; i < numberOfChildProcesses; i++) {
+            if (childProcesses.get(i).processID == childProcessID) {
+                childProcess = childProcesses.get(i);
+                break;
+            }
+        }
+
+        if (childProcess == null) {
+            Lib.debug(dbgProcess, "handleJoin: Child process with provided processID does not exist");
+            return -1;
+        }
+
+        childProcess.processThread.join();
+        childProcess.parentProcess = null;
+        childProcesses.remove(childProcess);
+
+        exitStatusLock.acquire();
+        Integer status = childProcessExitStatus.get(childProcessID);
+        exitStatusLock.release();
+
+        if (status == null) {
+            Lib.debug(dbgProcess, "handleJoin: Child process exited through an unhandled exception");
+            return 0;
+        } else {
+            if (writeVirtualMemory(virtualAddressOfChildExitStatus, Lib.bytesFromInt(status) ) == 4) {
+                return 1;
+            } else {
+                Lib.debug(dbgProcess, "handleJoin: Could not write exit status of child to specified virtual address");
+                return 0;
+            }
+        }
+    }
+
 
     private static final int
             syscallHalt = 0,
@@ -604,8 +692,12 @@ public class UserProcess {
     private static final int ROOT_PROCESS = 0;
     private static final int MAX_STRING_SIZE = 64;
 
+    protected Lock processIDLock = new Lock();
 
     // Task-3 Variables
     private ArrayList<UserProcess> childProcesses = new ArrayList<>();
     private UserProcess parentProcess;
+    private Lock exitStatusLock;
+    private HashMap<Integer, Integer> childProcessExitStatus = new HashMap<>();
+    protected UThread processThread;
 }
