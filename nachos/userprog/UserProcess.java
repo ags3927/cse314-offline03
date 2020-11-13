@@ -4,7 +4,7 @@ import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
 
-import java.io.EOFException;
+import java.io.*;
 
 import java.nio.Buffer;
 import java.util.ArrayList;
@@ -41,6 +41,10 @@ public class UserProcess {
         processIDLock.release();
 
         exitStatusLock = new Lock();
+
+        parentProcess = null;
+        childProcesses = new ArrayList<>();
+        childProcessExitStatus = new HashMap<>();
     }
 
 
@@ -64,10 +68,15 @@ public class UserProcess {
      * @return <tt>true</tt> if the program was successfully executed.
      */
     public boolean execute(String name, String[] args) {
-        if (!load(name, args))
-            return false;
+        System.out.println("Shell program name = " + name);
 
-        new UThread(this).setName(name).fork();
+        if (!load(name, args)) {
+            System.out.println("Failed to load");
+            return false;
+        }
+
+        processThread = (UThread) new UThread(this).setName(name);
+        processThread.fork();
 
         return true;
     }
@@ -335,6 +344,7 @@ public class UserProcess {
         OpenFile executable = ThreadedKernel.fileSystem.open(name, false);
         if (executable == null) {
             Lib.debug(dbgProcess, "\topen failed");
+//            System.out.println("Failed to open file");
             return false;
         }
 
@@ -342,6 +352,7 @@ public class UserProcess {
             coff = new Coff(executable);
         } catch (EOFException e) {
             executable.close();
+//            System.out.println("Failed to load coff");
             Lib.debug(dbgProcess, "\tcoff load failed");
             return false;
         }
@@ -550,11 +561,15 @@ public class UserProcess {
     private int handleRead(int fileDescriptor, int virtualMemoryAddress, int byteCount) {
         if (fileDescriptor > 1 || fileDescriptor < 0 || byteCount < 0) return -1;
 
+        if (virtualMemoryAddress < 0) return 0;
+
         byte[] buffer = new byte[byteCount];
 
-        int bytesRead = fileDescriptor == 0 ? inputStream.read(buffer, 0, byteCount) : outputStream.read(buffer, 0, byteCount);
+        int bytesRead = fileDescriptor == 0 ? inputStream.read(buffer, 0, byteCount) : -1;
 
-        if ((bytesRead * bytesRead + bytesRead) == 0) return -1;
+        if ((bytesRead * bytesRead + bytesRead) == 0) {
+            return -1;
+        }
 
         return writeVirtualMemory(virtualMemoryAddress, buffer, 0, bytesRead);
     }
@@ -576,6 +591,11 @@ public class UserProcess {
      * On error, -1 is returned, and the new file position is undefined. This can
      * happen if fileDescriptor is invalid, if part of the buffer is invalid, or
      * if a network stream has already been terminated by the remote host.
+     *
+     * @param fileDescriptor       the integer indexing the file to which the data is to be written
+     * @param virtualMemoryAddress the virtual memory address where the bytes to be written are stored
+     * @param byteCount            the number of bytes to be written
+     * @return Returns -1 upon failure. Returns the number of bytes that have been written upon success.
      */
     private int handleWrite(int fileDescriptor, int virtualMemoryAddress, int byteCount) {
         if (fileDescriptor > 1 || fileDescriptor < 0 || byteCount < 0) return -1;
@@ -906,9 +926,9 @@ public class UserProcess {
     protected Lock processIDLock = new Lock();
 
     // Task-3 Variables
-    private ArrayList<UserProcess> childProcesses = new ArrayList<>();
+    private ArrayList<UserProcess> childProcesses;
     private UserProcess parentProcess;
     private Lock exitStatusLock;
-    private HashMap<Integer, Integer> childProcessExitStatus = new HashMap<>();
+    private HashMap<Integer, Integer> childProcessExitStatus;
     protected UThread processThread;
 }
