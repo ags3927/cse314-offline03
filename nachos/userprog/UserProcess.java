@@ -822,6 +822,12 @@ public class UserProcess {
         switch (syscall) {
             case syscallHalt:
                 return handleHalt();
+            case syscallExit:
+                handleExit(a0);
+            case syscallExec:
+                return handleExec(a0, a1, a2);
+            case syscallJoin:
+                return handleJoin(a0, a1);
             case syscallRead:
                 return handleRead(a0, a1, a2);
             case syscallWrite:
