@@ -452,6 +452,16 @@ public class UserProcess {
         return 0;
     }
 
+    //// release all the physical pages while exiting ot terminating
+
+    private int handleExit(int status) {
+        //// aniruddha need to add codes here too
+        unloadSections();
+        return 0;
+    }
+
+    ////
+
 
     private static final int
             syscallHalt = 0,
