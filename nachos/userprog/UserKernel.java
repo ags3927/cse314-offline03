@@ -111,7 +111,7 @@ public class UserKernel extends ThreadedKernel {
 	super.terminate();
     }
 
-    //// pageList access functions
+    // pageList access functions
 
 	/**
 	 * Takes the first page from the list of available physical pages and returns its number.
@@ -161,7 +161,7 @@ public class UserKernel extends ThreadedKernel {
     // dummy variables to make javac smarter
     private static Coff dummy1 = null;
 
-    private static int numberOfPhysicalPages = Machine.processor().getNumPhysPages();   //// fetch total available physical page count
-	private static LinkedList<Integer> physicalPageList = new LinkedList<>();  //// linked list to keep track of used and unused physical pages
-	private static Lock pageListLock = new Lock();  //// lock to synchronize access in the linked list of pages
+    private static int numberOfPhysicalPages = Machine.processor().getNumPhysPages();   // fetch total available physical page count
+	private static LinkedList<Integer> physicalPageList = new LinkedList<>();  // linked list to keep track of used and unused physical pages
+	private static Lock pageListLock = new Lock();  // lock to synchronize access in the linked list of pages
 }
