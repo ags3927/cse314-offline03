@@ -134,16 +134,69 @@ public class UserProcess {
     int length) {
         Lib.assertTrue(offset >= 0 && length >= 0 && offset+length <= data.length);
 
+        if (numPages == 0) return 0;  //// no physical page allocated
+
         byte[] memory = Machine.processor().getMemory();
 
-        // for now, just assume that virtual addresses equal physical addresses
-        if (vaddr < 0 || vaddr >= memory.length)
-            return 0;
+//        // for now, just assume that virtual addresses equal physical addresses
+//        if (vaddr < 0 || vaddr >= memory.length)
+//            return 0;
+//
+//        int amount = Math.min(length, memory.length-vaddr);
+//        System.arraycopy(memory, vaddr, data, offset, amount);
 
-        int amount = Math.min(length, memory.length-vaddr);
-        System.arraycopy(memory, vaddr, data, offset, amount);
+        //// but life isn't a bed of roses :')
+        int transferredBytes = 0;
+        int vaddrEnd = vaddr + length -1;
 
-        return amount;
+        if (vaddr < 0 || vaddrEnd > Processor.makeAddress(numPages-1,pageSize-1)){
+            return 0;  //// virtual address must be within physical address limit
+        }
+
+        int startingPage = Processor.pageFromAddress(vaddr);
+        int endingPage = Processor.pageFromAddress(vaddrEnd);
+
+        for (int i=startingPage; i<= endingPage; i++){
+            if (i < 0 || i >= pageTable.length || !pageTable[i].valid){
+                transferredBytes = 0;
+                break;
+            }
+
+            int startingAddressForThisPage = Processor.makeAddress(i,0);
+            int endingAddressForThisPage = Processor.makeAddress(i, pageSize-1);
+
+            int transferredBytesForThisPage = 0;
+            int addressOffsetForThisPage;
+
+            if (vaddr >= startingAddressForThisPage && vaddrEnd <= endingAddressForThisPage){
+                //// this will hit the first page only
+                addressOffsetForThisPage = vaddr - startingAddressForThisPage;
+                transferredBytesForThisPage = length;
+
+            } else if (vaddr >= startingAddressForThisPage && vaddrEnd > endingAddressForThisPage){
+                //// this will hit the first page and continue further
+                addressOffsetForThisPage = vaddr - startingAddressForThisPage;
+                transferredBytes = endingAddressForThisPage - vaddr + 1;
+
+            } else if (vaddr < startingAddressForThisPage && vaddrEnd <= endingAddressForThisPage){
+                //// after it comes to second page and then so on
+                //// if it ends in this page
+                addressOffsetForThisPage = 0;
+                transferredBytesForThisPage = vaddrEnd - startingAddressForThisPage + 1;
+
+            } else {
+                //// if it doesnt end in this page
+                addressOffsetForThisPage = 0;
+                transferredBytesForThisPage = endingAddressForThisPage - startingAddressForThisPage + 1;
+            }
+
+            int physicalPageAddressForThisPage = Processor.makeAddress(pageTable[i].ppn,addressOffsetForThisPage);
+            System.arraycopy(memory,physicalPageAddressForThisPage,data,offset+transferredBytes,transferredBytesForThisPage);
+
+            transferredBytes += transferredBytesForThisPage;
+        }
+
+        return transferredBytes;
     }
 
     /**
