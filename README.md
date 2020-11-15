@@ -121,14 +121,14 @@ malloc() or free(), meaning that user programs effectively have no dynamic memor
 allocation needs (and therefore, no heap). What this means is that you know the complete
 memory needs of a process when it is created. You can allocate a fixed number of pages for
 the processe's stack; 8 pages should be sufficient.
-<br>
-We suggest maintaining a global linked list of free physical pages (perhaps as part of the
+
+* We suggest maintaining a global linked list of free physical pages (perhaps as part of the
 UserKernel class). Be sure to use synchronization where necessary when accessing this
 list. Your solution must make efficient use of memory by allocating pages for the new process
 wherever possible. This means that it is not acceptable to only allocate pages in a contiguous
 block; your solution must be able to make use of "gaps" in the free memory pool.
-<br>
-Also be sure that all of a process's memory is freed on exit (whether it exits normally, via the
+
+* Also be sure that all of a process's memory is freed on exit (whether it exits normally, via the
 syscall exit(), or abnormally, due to an illegal operation).
 
 * Modify UserProcess.readVirtualMemory and UserProcess.writeVirtual
